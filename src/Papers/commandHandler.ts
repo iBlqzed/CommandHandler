@@ -21,7 +21,7 @@ export class Command {
             name: commandInfo.name.toLowerCase(),
             description: commandInfo.description,
             aliases: commandInfo.aliases?.map(aL => aL.toLowerCase()),
-            permissions: commandInfo.permissions,
+            permissions: commandInfo.permissions ?? undefined,
             callback: null,
             arguments: null
         }
@@ -58,8 +58,10 @@ world.events.beforeChat.subscribe(data => {
     const args = data.message.slice(commandPrefix.length).trim().split(/\s+/)
     const command = Command.registeredCommands.find(cmd => cmd.name === args[0] || cmd.aliases?.includes(args[0]))
     if (!command) return broadcastMessage(`§cInvalid command!`)
+    if (command.permissions.length && data.sender.getTags().filter(tag => command.permissions.includes(tag)).length !== command.permissions.length) return broadcastMessage(`§cYou do not have permission to run this command!`)
     const sortedArgs = command.arguments?.sort((a, b) => a.index - b.index),
         callbackArgs: { type: keyof argumentTypes, value: any }[] = []
+    args.shift()
     let foundArg = true, argTest = 1, playerCheck = { value: '', check: false }, loopAmount = sortedArgs[sortedArgs.length - 1]?.index + 1, indexPlus = 0
     if (isNaN(loopAmount)) loopAmount = 0
     for (let i = 0; i < loopAmount; i++) {
