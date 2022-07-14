@@ -12,6 +12,8 @@ export class Command {
      */
     constructor(commandInfo) {
         this.arguments = [];
+        if (commandInfo.name.includes(' ') || commandInfo.aliases?.find(aL => aL.includes(' ')))
+            throw new Error('Command names or aliases can\'t have spaces in them');
         this.registeredCommand = {
             name: commandInfo.name.toLowerCase(),
             description: commandInfo.description,
@@ -49,11 +51,12 @@ world.events.beforeChat.subscribe(data => {
     if (!data.message.startsWith(commandPrefix))
         return;
     data.cancel = true;
-    const command = Command.registeredCommands.find(cmd => cmd.name === data.message.slice(commandPrefix.length, cmd.name.length + commandPrefix.length) || cmd.aliases?.includes(data.message.slice(commandPrefix.length, cmd.name.length + commandPrefix.length)));
+    const args = data.message.slice(commandPrefix.length).trim().split(/\s+/);
+    const command = Command.registeredCommands.find(cmd => cmd.name === args[0] || cmd.aliases?.includes(args[0]));
     if (!command)
         return broadcastMessage(`§cInvalid command!`);
     const sortedArgs = command.arguments?.sort((a, b) => a.index - b.index), callbackArgs = [];
-    let foundArg = true, argTest = 1, args = data.message.slice(command.name.length + commandPrefix.length).trim().split(/\s+/), playerCheck = { value: '', check: false }, loopAmount = sortedArgs[sortedArgs.length - 1]?.index + 1, indexPlus = 0;
+    let foundArg = true, argTest = 1, playerCheck = { value: '', check: false }, loopAmount = sortedArgs[sortedArgs.length - 1]?.index + 1, indexPlus = 0;
     if (isNaN(loopAmount))
         loopAmount = 0;
     for (let i = 0; i < loopAmount; i++) {

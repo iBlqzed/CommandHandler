@@ -2,7 +2,8 @@ import { Player, world } from "mojang-minecraft"
 import { Command } from "./Papers/commandHandler"
 
 const myCommand = new Command({
-    name: 'broadcast'
+    name: 'broadcast',
+    aliases: ['hi']
 })
 myCommand.callback((player, args) => {
     broadcastMessage(args.map(arg => arg.value).join(' '))
