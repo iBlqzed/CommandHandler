@@ -24,7 +24,7 @@ export class Command {
         };
     }
     /**
-     * Add a argument
+     * Add an argument
      * @param {number} index Index of the argument to set the type to
      * @param {keyof argumentTypes} type The type of the argument
      */
@@ -140,9 +140,11 @@ world.events.beforeChat.subscribe(data => {
                         break;
                     }
                 callbackArgs.push({ type: 'player', value: testValue });
-                testValue.split("").forEach(letter => { if (letter === ' ') {
-                    indexPlus++;
-                } });
+                testValue.split("").forEach(letter => {
+                    if (letter === ' ') {
+                        indexPlus++;
+                    }
+                });
             }
             else {
                 foundArg = false;

@@ -23,10 +23,6 @@ kickCommand.register() //Registering the command
 
 
 
-
-
-
-
 /**
  * Broadcast a message (or send it to a player)
  * @param {string} message Message to broadcast
