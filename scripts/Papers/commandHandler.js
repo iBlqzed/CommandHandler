@@ -22,11 +22,11 @@ export class Command {
         };
     }
     /**
-     * Add a dynamic argument
+     * Add a argument
      * @param {number} index Index of the argument to set the type to
      * @param {keyof argumentTypes} type The type of the argument
      */
-    addDynamicArgument(index, type) {
+    addArgument(index, type) {
         this.arguments.push({ index, type });
     }
     /**
@@ -103,9 +103,10 @@ function broadcastMessage(message, player) {
 const myCommand = new Command({
     name: 'test'
 });
-myCommand.addDynamicArgument(0, 'any');
-myCommand.addDynamicArgument(3, 'boolean');
+myCommand.addArgument(0, 'number');
+myCommand.addArgument(0, 'boolean');
+myCommand.addArgument(1, 'boolean');
 myCommand.callback((player, args) => {
-    console.warn(args[0].value); //Will warn either "true" or "false"
+    player.runCommand(`say ${player.name}`);
 });
 myCommand.register();
