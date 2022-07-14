@@ -1,4 +1,5 @@
 import { Player, world } from "mojang-minecraft"
+import { flattenDiagnosticMessageText } from "typescript"
 
 const commandPrefix = '?'
 
@@ -56,13 +57,13 @@ world.events.beforeChat.subscribe(data => {
     data.cancel = true
     const command = Command.registeredCommands.find(cmd => cmd.name === data.message.slice(commandPrefix.length, cmd.name.length + commandPrefix.length))
     if (!command) return broadcastMessage(`§cInvalid command!`)
-    const args = data.message.slice(command.name.length + commandPrefix.length).trim().split(/\s+/),
-        sortedArgs = command.arguments?.sort((a, b) => a.index - b.index),
+    const sortedArgs = command.arguments?.sort((a, b) => a.index - b.index),
         callbackArgs: { type: keyof argumentTypes, value: any }[] = []
-    let foundArg = true, argTest = 1
-    for (let i = 0; i < sortedArgs[sortedArgs.length - 1].index + 1; i++) {
+    let foundArg = true, argTest = 1, args = data.message.slice(command.name.length + commandPrefix.length).trim().split(/\s+/), playerCheck = { value: '', check: false }, loopAmount = sortedArgs[sortedArgs.length - 1].index + 1, indexPlus = 0
+    for (let i = 0; i < loopAmount; i++) {
         const argsData = command.arguments.filter((arg) => arg.index === i)
-        const argValue = args[i] ?? undefined
+        const argValue = args[i + indexPlus] ?? undefined
+        if (argsData.find(value => value.type === 'player')) playerCheck.check = true
         if (argsData.length === 0) { if (argValue !== '' && argValue !== undefined) { callbackArgs.push({ type: 'any', value: argValue }) } }
         else argsData.forEach(arg => {
             if (arg.type === 'number') { if (Number(argValue)) callbackArgs.push({ type: 'number', value: Number(argValue) }) }
@@ -74,23 +75,49 @@ world.events.beforeChat.subscribe(data => {
             if (arg.type === 'any') { if (argValue !== '' && argValue !== undefined) callbackArgs.push({ type: 'any', value: argValue }) }
         })
         if (argTest !== callbackArgs.length) {
-            foundArg = false
-            broadcastMessage(`§c${argValue === '' || argValue === undefined ? '[Nothing]' : argValue} is not of type ${JSON.stringify(argsData.map(arg => arg.type)) !== '[]' ? JSON.stringify(argsData.map(arg => arg.type)).slice(2, -2).replaceAll('","', ", ") : 'any'}`, data.sender)
-            break
+            if (playerCheck.check) {
+                playerCheck.check = false
+                if (!argValue?.startsWith('"')) {
+                    broadcastMessage(`§cA player's name must start with a §4"§c!`, data.sender)
+                    foundArg = false
+                    break
+                }
+                let testValue = args.filter((e, index) => index >= i).join(' ').slice(1)
+                testValue = testValue.slice(0, testValue.includes('"') ? testValue.indexOf('"') : 0)
+                if (testValue === '') {
+                    broadcastMessage(`§cA player's name must end with a §4"§c!`, data.sender)
+                    foundArg = false
+                    break
+                }
+                if (testValue.length > 20) {
+                    broadcastMessage(`§cPlayer's name is too long!`, data.sender)
+                    foundArg = false
+                    break
+                }
+                callbackArgs.push({ type: 'player', value: testValue })
+                testValue.split("").forEach(letter => { if (letter === ' ') { indexPlus++ } })
+            } else {
+                foundArg = false
+                broadcastMessage(`§c${argValue === '' || argValue === undefined ? '[Nothing]' : argValue} is not of type ${JSON.stringify(argsData.map(arg => arg.type)) !== '[]' ? JSON.stringify(argsData.map(arg => arg.type)).slice(2, -2).replaceAll('","', ", ") : 'any'}`, data.sender)
+                break
+            }
         }
         argTest++
     }
-    if (foundArg) command.callback(data.sender, callbackArgs)
+    if (foundArg) {
+        if (args.length > loopAmount) for (let i = 0; i < args.length - loopAmount; i++) callbackArgs.push({ type: 'any', value: args[i + loopAmount] })
+        command.callback(data.sender, callbackArgs)
+    }
 })
 
 interface argumentTypes {
-    create: string
-    set: string
-    remove: string
-    invite: string
-    player: Player
-    number: number
-    boolean: boolean
+    create: string,
+    set: string,
+    remove: string,
+    invite: string,
+    player: Player,
+    number: number,
+    boolean: boolean,
     any: any
 }
 
@@ -129,17 +156,3 @@ function broadcastMessage(message: string, player?: Player | Player[]) {
     else if (player instanceof Player) player.runCommand(`tellraw @a ${JSON.stringify({ rawtext: [{ text: message }] })}`)
     else player.forEach(pL => pL.runCommand(`tellraw @a ${JSON.stringify({ rawtext: [{ text: message }] })}`))
 }
-
-
-
-
-
-const myCommand = new Command({
-    name: 'test'
-})
-myCommand.addArgument(0, 'set')
-myCommand.addArgument(1, 'any')
-myCommand.callback((player, args) => {
-    player.runCommand(`say ${player.name}`)
-})
-myCommand.register()

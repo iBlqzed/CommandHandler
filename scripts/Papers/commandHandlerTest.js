@@ -24,7 +24,7 @@ export class Command {
     /**
      * Add a argument
      * @param {number} index Index of the argument to set the type to
-     * @param {keyof argumentTypes} type The type of the argument
+     * @param {keyof { create: string, set: string, remove: string, invite: string, player: Player, number: number, boolean: boolean, any: any }} type The type of the argument
      */
     addArgument(index, type) {
         this.arguments.push({ index, type });
@@ -55,6 +55,7 @@ world.events.beforeChat.subscribe(data => {
     const sortedArgs = command.arguments?.sort((a, b) => a.index - b.index), callbackArgs = [];
     let foundArg = true, argTest = 1, args = data.message.slice(command.name.length + commandPrefix.length).trim().split(/\s+/), playerCheck = { value: '', check: false }, loopAmount = sortedArgs[sortedArgs.length - 1].index + 1, indexPlus = 0;
     for (let i = 0; i < loopAmount; i++) {
+        console.warn(i);
         const argsData = command.arguments.filter((arg) => arg.index === i);
         const argValue = args[i + indexPlus] ?? undefined;
         if (argsData.find(value => value.type === 'player'))
@@ -128,12 +129,8 @@ world.events.beforeChat.subscribe(data => {
         }
         argTest++;
     }
-    if (foundArg) {
-        if (args.length > loopAmount)
-            for (let i = 0; i < args.length - loopAmount; i++)
-                callbackArgs.push({ type: 'any', value: args[i + loopAmount] });
+    if (foundArg)
         command.callback(data.sender, callbackArgs);
-    }
 });
 /**
  * Broadcast a message (or send it to a player)
