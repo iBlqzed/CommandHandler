@@ -53,11 +53,11 @@ world.events.beforeChat.subscribe(data => {
     if (!command)
         return broadcastMessage(`§cInvalid command!`);
     const sortedArgs = command.arguments?.sort((a, b) => a.index - b.index), callbackArgs = [];
-    let foundArg = true, argTest = 1, args = data.message.slice(command.name.length + commandPrefix.length).trim().split(/\s+/), playerCheck = { value: '', check: false }, loopAmount = sortedArgs[sortedArgs.length - 1].index + 1, indexPlus = 0;
+    let foundArg = true, argTest = 1, args = data.message.slice(command.name.length + commandPrefix.length).trim().split(/\s+/), playerCheck = { value: '', check: false }, loopAmount = sortedArgs[sortedArgs.length - 1]?.index + 1, indexPlus = 0;
     for (let i = 0; i < loopAmount; i++) {
         const argsData = command.arguments.filter((arg) => arg.index === i);
         const argValue = args[i + indexPlus] ?? undefined;
-        if (argsData.find(value => value.type === 'player'))
+        if (argsData.find(value => value.type === 'player' || value.type === 'playerOnline'))
             playerCheck.check = true;
         if (argsData.length === 0) {
             if (argValue !== '' && argValue !== undefined) {
@@ -98,8 +98,18 @@ world.events.beforeChat.subscribe(data => {
         if (argTest !== callbackArgs.length) {
             if (playerCheck.check) {
                 playerCheck.check = false;
+                if (argValue === '' || argValue === undefined) {
+                    foundArg = false;
+                    broadcastMessage(`§c${argValue === '' || argValue === undefined ? '[Nothing]' : argValue} is not of type ${JSON.stringify(argsData.map(arg => arg.type)) !== '[]' ? JSON.stringify(argsData.map(arg => arg.type)).slice(2, -2).replaceAll('","', ", ") : 'any'} (btw a player\'s name has to start with a ")`, data.sender);
+                    break;
+                }
                 if (!argValue?.startsWith('"')) {
-                    broadcastMessage(`§cA player's name must start with a §4"§c!`, data.sender);
+                    if (argsData.length > argsData.filter(value => value.type === 'player' || value.type === 'playerOnline').length)
+                        broadcastMessage(`§c${argValue === '' || argValue === undefined ? '[Nothing]' : argValue} is not of type ${JSON.stringify(argsData.map(arg => arg.type)) !== '[]' ? JSON.stringify(argsData.map(arg => arg.type)).slice(2, -2).replaceAll('","', ", ") : 'any'} (btw a player\'s name has to start with a ")`, data.sender);
+                    else {
+                        broadcastMessage(`§cA player's name must start with a §4"§c!`, data.sender);
+                        foundArg = false;
+                    }
                     foundArg = false;
                     break;
                 }
@@ -115,6 +125,12 @@ world.events.beforeChat.subscribe(data => {
                     foundArg = false;
                     break;
                 }
+                if (argsData.find(arg => arg.type === 'playerOnline'))
+                    if ([...world.getPlayers()].find(plr => plr.name !== testValue)) {
+                        broadcastMessage('§cPlayer is not online', data.sender);
+                        foundArg = false;
+                        break;
+                    }
                 callbackArgs.push({ type: 'player', value: testValue });
                 testValue.split("").forEach(letter => { if (letter === ' ') {
                     indexPlus++;
