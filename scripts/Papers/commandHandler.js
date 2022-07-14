@@ -44,6 +44,7 @@ export class Command {
     }
 }
 Command.registeredCommands = [];
+const create = ['create', 'c', 'add', 'make'], remove = ['remove', 'delete', 'r'], set = ['set', 'change'], invite = ['invite', 'inv', 'i'];
 world.events.beforeChat.subscribe(data => {
     if (!data.message.startsWith(commandPrefix))
         return;
@@ -67,11 +68,27 @@ world.events.beforeChat.subscribe(data => {
                     if (Number(argValue))
                         callbackArgs.push({ type: 'number', value: Number(argValue) });
                 }
-                else if (arg.type === 'boolean') {
+                if (arg.type === 'boolean') {
                     if (argValue === 'true' || argValue === 'false')
                         callbackArgs.push({ type: 'boolean', value: argValue === 'true' ? true : false });
                 }
-                else if (arg.type === 'any') {
+                if (arg.type === 'create') {
+                    if (create.includes(argValue))
+                        callbackArgs.push({ type: 'create', value: argValue });
+                }
+                if (arg.type === 'remove') {
+                    if (remove.includes(argValue))
+                        callbackArgs.push({ type: 'remove', value: argValue });
+                }
+                if (arg.type === 'set') {
+                    if (set.includes(argValue))
+                        callbackArgs.push({ type: 'set', value: argValue });
+                }
+                if (arg.type === 'invite') {
+                    if (invite.includes(argValue))
+                        callbackArgs.push({ type: 'invite', value: argValue });
+                }
+                if (arg.type === 'any') {
                     if (argValue !== '' && argValue !== undefined)
                         callbackArgs.push({ type: 'any', value: argValue });
                 }
@@ -103,9 +120,8 @@ function broadcastMessage(message, player) {
 const myCommand = new Command({
     name: 'test'
 });
-myCommand.addArgument(0, 'number');
-myCommand.addArgument(0, 'boolean');
-myCommand.addArgument(1, 'boolean');
+myCommand.addArgument(0, 'set');
+myCommand.addArgument(1, 'any');
 myCommand.callback((player, args) => {
     player.runCommand(`say ${player.name}`);
 });

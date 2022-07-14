@@ -47,7 +47,10 @@ export class Command {
         Command.registeredCommands.push(Object.assign(this.registeredCommand, { arguments: this.arguments }))
     }
 }
-
+const create = ['create', 'c', 'add', 'make'],
+    remove = ['remove', 'delete', 'r'],
+    set = ['set', 'change'],
+    invite = ['invite', 'inv', 'i']
 world.events.beforeChat.subscribe(data => {
     if (!data.message.startsWith(commandPrefix)) return
     data.cancel = true
@@ -63,8 +66,12 @@ world.events.beforeChat.subscribe(data => {
         if (argsData.length === 0) { if (argValue !== '' && argValue !== undefined) { callbackArgs.push({ type: 'any', value: argValue }) } }
         else argsData.forEach(arg => {
             if (arg.type === 'number') { if (Number(argValue)) callbackArgs.push({ type: 'number', value: Number(argValue) }) }
-            else if (arg.type === 'boolean') { if (argValue === 'true' || argValue === 'false') callbackArgs.push({ type: 'boolean', value: argValue === 'true' ? true : false }) }
-            else if (arg.type === 'any') { if (argValue !== '' && argValue !== undefined) callbackArgs.push({ type: 'any', value: argValue }) }
+            if (arg.type === 'boolean') { if (argValue === 'true' || argValue === 'false') callbackArgs.push({ type: 'boolean', value: argValue === 'true' ? true : false }) }
+            if (arg.type === 'create') { if (create.includes(argValue)) callbackArgs.push({ type: 'create', value: argValue }) }
+            if (arg.type === 'remove') { if (remove.includes(argValue)) callbackArgs.push({ type: 'remove', value: argValue }) }
+            if (arg.type === 'set') { if (set.includes(argValue)) callbackArgs.push({ type: 'set', value: argValue }) }
+            if (arg.type === 'invite') { if (invite.includes(argValue)) callbackArgs.push({ type: 'invite', value: argValue }) }
+            if (arg.type === 'any') { if (argValue !== '' && argValue !== undefined) callbackArgs.push({ type: 'any', value: argValue }) }
         })
         if (argTest !== callbackArgs.length) {
             foundArg = false
@@ -123,12 +130,15 @@ function broadcastMessage(message: string, player?: Player | Player[]) {
     else player.forEach(pL => pL.runCommand(`tellraw @a ${JSON.stringify({ rawtext: [{ text: message }] })}`))
 }
 
+
+
+
+
 const myCommand = new Command({
     name: 'test'
 })
-myCommand.addArgument(0, 'number')
-myCommand.addArgument(0, 'boolean')
-myCommand.addArgument(1, 'boolean')
+myCommand.addArgument(0, 'set')
+myCommand.addArgument(1, 'any')
 myCommand.callback((player, args) => {
     player.runCommand(`say ${player.name}`)
 })
