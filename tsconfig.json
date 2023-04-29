@@ -11,13 +11,10 @@
         "noImplicitAny": true,
         "preserveConstEnums": true,
         "sourceMap": false,
-        "outDir": "scripts",
-        "declaration": true,
-        "declarationDir": "scripts"
+        "outDir": "scripts"
     },
     "include": [
-        "src",
-        "node_modules/@types/mojang-minecraft/index.d.ts"
+        "src"
     ],
     "exclude": [
         "scripts"
