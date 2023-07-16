@@ -1,5 +1,5 @@
 import { Command } from "../CommandHandler/index.js"
-import { world, Player } from "@minecraft/server"
+import { world } from "@minecraft/server"
 
 const cmd = new Command({ name: "broadcast", permission: (plr) => plr.hasTag("Admin") })
 

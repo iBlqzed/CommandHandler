@@ -15,7 +15,7 @@ cmd.addChainedArguments(["player", "number"], (player, [target, money]) => {
 });
 function getScore(player, objective) {
     try {
-        return world.scoreboard.getObjective(objective).getScore(player.scoreboard);
+        return world.scoreboard.getObjective(objective).getScore(player.scoreboardIdentity);
     }
     catch {
         return 0;

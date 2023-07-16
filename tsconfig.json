@@ -11,7 +11,9 @@
         "noImplicitAny": true,
         "preserveConstEnums": true,
         "sourceMap": false,
-        "outDir": "scripts"
+        "outDir": "scripts",
+        "declaration": true,
+        "declarationDir": "scripts"
     },
     "include": [
         "src"
