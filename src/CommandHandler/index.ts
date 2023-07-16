@@ -89,82 +89,19 @@ world.afterEvents.chatSend.subscribe(ev => {
 			nextArg = args.shift()
 			continue
 		}
-		let result = null
 		const oldArg = nextArg
 		let found = false
 		for (const chainedArg of data.chainedArguments) {
 			const results = []
-			let i = 0
+			let argsCopy = args.map(v => v)
 			for (const arg of chainedArg[0]) {
-				if (arg === "all") {
-					if (i - 1 === args.length) break
-					results.push(args.slice(i - 1).join(' '))
-					break
-				}
-				switch (arg) {
-					case "string": {
-						if (!nextArg) {
-							if (results.length !== 0) player.sendMessage(`§cInvalid argument! You need to input a string afterwards!`)
-							continue
-						}
-						results.push(nextArg)
-						break
-					}
-					case "number": {
-						if (!nextArg) {
-							if (results.length !== 0) player.sendMessage(`§cInvalid argument! You need to input a number afterwards!`)
-							continue
-						}
-						const num = Number(nextArg)
-						if (isNaN(num)) {
-							if (results.length !== 0) player.sendMessage(`§cInvalid argument! You need to input a number afterwards!`)
-							break
-						}
-						results.push(num)
-						break
-					}
-					case "boolean": {
-						if (!nextArg) {
-							if (results.length !== 0) player.sendMessage(`§cInvalid argument! You need to input a boolean (true or false) afterwards!`)
-							continue
-						}
-						const v = nextArg.toLowerCase()
-						if (!["true", "false"].includes(v)) {
-							if (results.length !== 0) player.sendMessage(`§cInvalid argument! You need to input a boolean (true or false) afterwards!`)
-							break
-						}
-						results.push(v === "true" ? true : false)
-						break
-					}
-					case "player": {
-						if (!nextArg || !nextArg.startsWith('"')) {
-							player.sendMessage(`§cInvalid argument ${nextArg ?? "[Nothing]"} in command ${data.name}! Player name needs to start with "!`)
-							break
-						}
-						let res = "", t = 0
-						const oldI = i
-						while (nextArg) {
-							if (nextArg.endsWith('"')) {
-								result = [...world.getPlayers({ name: (res + nextArg).slice(1, -1) })][0]
-								if (!result) {
-									player.sendMessage(`§cInvalid argument ${res + nextArg} in command ${data.name}! Player is not online!`)
-								} else results.push(result)
-								break
-							}
-							res += nextArg + " "
-							nextArg = args[t++]
-							i++
-						}
-						if (!nextArg) {
-							player.sendMessage(`§cInvalid argument ${res}in command ${data.name}! Player name needs to end with "!`)
-							i = oldI - 1
-						}
-						break
-					}
-				}
-				nextArg = args[i++]
+				if (!nextArg) break
+				const [result, v] = (argTypes[arg](nextArg, argsCopy, player) ?? [undefined, undefined])
+				if (!v) break
+				results.push(result)
+				argsCopy = v
+				nextArg = v.shift()
 			}
-			i = 0
 			nextArg = oldArg
 			if (results.length !== chainedArg[0].length) continue
 			chainedArg[1](player, results)
@@ -172,7 +109,10 @@ world.afterEvents.chatSend.subscribe(ev => {
 			break
 		}
 		if (found) return
-		if (data.arguments.length === 0) break
+		if (data.arguments.length === 0) {
+			if (!found) player.sendMessage(`§cInvalid argument ${nextArg ?? "[Nothing]"}, expected ${data.chainedArguments.map(v => v[0].join(", ")).join(" or ")}`)
+			break
+		}
 		if (!nextArg || nextArg === "") {
 			player.sendMessage(`§cInvalid argument [Nothing], expected ${data.arguments.map(v => v[0]).join(", ")}`)
 			break
