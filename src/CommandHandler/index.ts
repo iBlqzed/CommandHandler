@@ -12,25 +12,22 @@ export class Command {
 	protected data: CommandData = {
 		name: "",
 		arguments: [],
-		chainedArguments: [],
 		subCommands: {}
 	}
 
 	constructor(info: CommandInfo) {
 		this.data.name = info.name.toLowerCase()
 		this.data.permission = info.permission ?? (() => true)
-		this.data.callback = info.callback ?? (() => true)
+		this.data.callback = info.callback
 	}
 
-	addArgument<T extends keyof CommandArguments>(type: T, callback: (player: Player, value: CommandArguments[T]) => void): this {
-		this.data.arguments[this.data.arguments.length] = [type, callback]
-		return this
+	addArgument<T extends keyof CommandArguments>(type: T, callback?: (player: Player, value: CommandArguments[T]) => void): Argument<T> {
+		//@ts-ignore
+		return (this.data.arguments[this.data.arguments.length] = new Argument(type, false, callback))
 	}
 
-	//@ts-ignore
-	addChainedArguments<T = Array<keyof CommandArguments>>(types: T, callback: (player: Player, args: KeyArrayToTypeArray<T>) => void): this {
-		this.data.chainedArguments[this.data.chainedArguments.length] = [types as unknown as Array<keyof CommandArguments>, callback]
-		return this
+	addOptionalArgument<T extends keyof CommandArguments>(type: T, callback?: (player: Player, value: CommandArguments[T]) => void): Argument<T> {
+		return (this.data.arguments[this.data.arguments.length] = new Argument(type, true, callback))
 	}
 
 	addSubCommand(command: Command): this {
@@ -39,18 +36,71 @@ export class Command {
 	}
 }
 
+
+class Argument<T extends keyof CommandArguments, Prev extends Argument<keyof CommandArguments, any> = undefined> {
+
+	protected nextArg?: Argument<keyof CommandArguments>
+
+	constructor(public type: T, public optional: boolean = false, protected callback?: (player: Player, data: GetArgument<Argument<T, Prev>>) => void) { }
+
+	//@ts-ignore
+	chainArgument<K extends keyof CommandArguments>(type: K, optional: boolean = false, callback?: (player: Player, data: GetArgument<ArgumentArrayToChain<ReverseArgumentArray<Argument<K, this>>>>) => void): Argument<K, this> {
+		if (this.optional && !optional) optional = true
+		//@ts-ignore
+		return (this.nextArg = new Argument(type, optional, callback))
+	}
+
+	protected execute(player: Player, arg: string, other: string[], prevResult?: any): boolean {
+		const handleOptionalError = () => {
+			if (!this.nextArg) {
+				//@ts-ignore
+				this.callback?.(player, prevResult ? [prevResult, null] : null)
+				return true
+			}
+			let nextArg = this.nextArg
+			const results = prevResult ? [...prevResult] : [null]
+			while (true) {
+				if (!nextArg.nextArg) return
+				nextArg = nextArg.nextArg
+				results.push(null)
+				break
+			}
+			nextArg.callback(player, results as any)
+			return true
+		}
+		if (!arg || arg === "") {
+			if (this.optional) return handleOptionalError()
+			return false
+		}
+		const [result, args] = argTypes[this.type](arg, other, player) ?? [undefined, undefined]
+		if (!args) {
+			if (this.optional) return handleOptionalError()
+			return false
+		}
+		if (this.nextArg) return this.nextArg.execute(player, args.shift(), args, prevResult ? [...prevResult, result] : [result])
+		//@ts-ignore
+		this.callback?.(player, prevResult ? [...prevResult, result] : result)
+		return true
+	}
+}
+
+//@ts-ignore
+type ArgumentArrayToChain<T extends (keyof CommandArguments)[]> = T extends [infer Head, ...infer Rest] ? Argument<Head, ArgumentArrayToChain<Rest>> : undefined
+type GetArgument<T extends Argument<keyof CommandArguments, any>> = T extends Argument<infer E, infer P> ? P extends undefined ? CommandArguments[E] : FlattenArray<[CommandArguments[E], GetArgument<P>]> : T
+type FlattenArray<T extends any[]> = T extends [infer Head, infer Rest] ? [...(Head extends any[] ? FlattenArray<Head> : [Head]), ...(Rest extends any[] ? FlattenArray<Rest> : [Rest])] : [];
+//@ts-ignore
+type ReverseArgumentArray<T extends Argument<keyof CommandArguments, any>> = T extends Argument<infer P, infer K> ? K extends undefined ? [P] : [...ReverseArgumentArray<K>, P] : T
+
 const argTypes: Partial<{ [K in keyof CommandArguments]: (nextArg: string, args: string[], player: Player) => [CommandArguments[K], string[]] | undefined }> = {}
+
 
 type CommandArguments = {
 	string: string
 	number: number
 	boolean: boolean
 	player: Player
+	offlinePlayer: string
 	all: string
-}
-
-type KeyArrayToTypeArray<K extends any[]> = {
-	[P in keyof K]: CommandArguments[K[P]]
 }
 
 type CommandInfo = {
@@ -60,8 +110,7 @@ type CommandInfo = {
 }
 
 type CommandData = CommandInfo & {
-	chainedArguments: Array<[Array<keyof CommandArguments>, (...args: any[]) => void]>
-	arguments: Array<[keyof CommandArguments, (...args: any[]) => void]>
+	arguments: Argument<keyof CommandArguments>[]
 	subCommands: Record<string, CommandData>
 }
 
@@ -76,64 +125,49 @@ world.afterEvents.chatSend.subscribe(ev => {
 	const player = ev.sender
 	const [name, ...args] = ev.message.slice(commandPrefix.length).trim().split(/\s+/g)
 	//@ts-ignore
-	let data = Command.cache[name.toLowerCase()]
+	let data: CommandData = Command.cache[name.toLowerCase()]
+	//@ts-ignore
+	if (data?.callback) data.callback(player, args)
 	let nextArg = args.shift()
 	if (!data) return player.sendMessage(`§cInvalid command!`)
+	//@ts-ignore
 	if (!data.permission(player)) return player.sendMessage(`§cInvalid command permission!`)
-	data.callback(player, [nextArg, ...args])
+	const end = (arg?: string) => {
+		const keys = Object.keys(data.subCommands)
+		const argthing = (arg: Argument<any>, prevType: any = ""): string => {
+			//@ts-ignore
+			if (arg.nextArg) return argthing(arg.nextArg, prevType + arg.type + "-")
+			return prevType + arg.type
+		}
+		//@ts-ignore
+		player.sendMessage(`§cInvalid argument ${arg ?? "[Nothing]"}, expected ${[(keys.length === 0 ? undefined : keys.join(", ")), (data.arguments.length === 0 ? undefined : data.arguments.map(v => argthing(v)).join(", "))].filter(v => v).join(" or ")}`)
+	}
 	while (true) {
-		const sub = data.subCommands[nextArg ?? '']
+		const sub = data.subCommands?.[nextArg ?? '']
 		if (sub) {
 			if (!sub.permission(player)) return player.sendMessage(`§cInvalid sub-command permission for command ${sub.name}!`)
 			data = sub
 			nextArg = args.shift()
 			continue
 		}
-		const oldArg = nextArg
 		let found = false
-		for (const chainedArg of data.chainedArguments) {
-			const results = []
-			let argsCopy = args.map(v => v)
-			for (const arg of chainedArg[0]) {
-				if (!nextArg) break
-				const [result, v] = (argTypes[arg](nextArg, argsCopy, player) ?? [undefined, undefined])
-				if (!v) break
-				results.push(result)
-				argsCopy = v
-				nextArg = v.shift()
-			}
-			nextArg = oldArg
-			if (results.length !== chainedArg[0].length) continue
-			chainedArg[1](player, results)
-			found = true
-			break
-		}
-		if (found) return
-		if (data.arguments.length === 0) {
-			if (!found) player.sendMessage(`§cInvalid argument ${nextArg ?? "[Nothing]"}, expected ${data.chainedArguments.map(v => v[0].join(", ")).join(" or ")}`)
-			break
-		}
-		if (!nextArg || nextArg === "") {
-			player.sendMessage(`§cInvalid argument [Nothing], expected ${data.arguments.map(v => v[0]).join(", ")}`)
-			break
-		}
+		if (data.arguments.length === 0) return end()
 		for (const arg of data.arguments) {
-			const [result, v] = (argTypes[arg[0]](nextArg, args, player) ?? [undefined, undefined])
-			if (!v) continue
-			arg[1](player, result)
+			//@ts-ignore
+			const worked = arg.execute(player, nextArg, args)
+			if (!worked) continue
 			found = true
 			break
 		}
-		if (!found) player.sendMessage(`§cInvalid argument ${nextArg}, expected ${data.arguments.map(v => v[0]).join(", ")}`)
+		if (!found) return end(nextArg)
 		break
 	}
 })
 
-function addArgument<T extends keyof CommandArguments>(type: T, callback: (nextArg: string, args: string[], player: Player) => [CommandArguments[T], string[], boolean?] | undefined) {
+function addArgument<T extends keyof CommandArguments>(type: T, callback: (nextArg: string, args: string[], player: Player) => [CommandArguments[T], string[]] | void) {
 	//@ts-ignore
 	argTypes[type] = callback
 }
-
 
 addArgument("all", (nextArg, args) => {
 	return [[nextArg, ...args].join(" "), []]
@@ -141,11 +175,11 @@ addArgument("all", (nextArg, args) => {
 
 addArgument("string", (nextArg, args) => {
 	if (nextArg.startsWith('"')) {
-		const argsCopy = new Proxy(args, {})
+		const argsCopy = args.map(v => v)
 		let currentArg = nextArg, result = ""
 		while (currentArg) {
 			result += " " + currentArg
-			if (result.endsWith('"')) return [result.slice(1, -1), argsCopy]
+			if (result.endsWith('"') && result !== ' "') return [result.slice(2, -1), argsCopy]
 			currentArg = argsCopy.shift()
 		}
 	}
@@ -174,11 +208,23 @@ addArgument("player", (nextArg, args, player) => {
 	while (currentArg) {
 		result += currentArg
 		if (result.endsWith('"')) {
-			const player = world.getPlayers({ name: result.slice(1, -1) })[0]
-			if (!player) return end(`Player ${result} not online!`)
-			return [player, args]
+			const target = world.getPlayers({ name: result.slice(1, -1) })[0]
+			if (!target) return end(`Player ${result} not online!`)
+			return [target, args]
 		}
-		args.shift()
+		currentArg = args.shift()
+	}
+	return end(`Player name needs to end with a "!`)
+})
+
+addArgument("offlinePlayer", (nextArg, args, player) => {
+	const end = (msg: string) => player.sendMessage(`§c${msg}`)
+	if (!nextArg.startsWith('"')) return end(`Invalid argument ${nextArg ?? "[Nothing]"}! Player name needs to start with "!`)
+	let currentArg = nextArg, result = ""
+	while (currentArg) {
+		result += currentArg
+		if (result.endsWith('"')) return [result.slice(1, -1), args]
+		currentArg = args.shift()
 	}
 	return end(`Player name needs to end with a "!`)
 })

@@ -1,7 +1,8 @@
 import { Command } from "../CommandHandler/index.js";
 import { world } from "@minecraft/server";
 const cmd = new Command({ name: "pay" });
-cmd.addChainedArguments(["player", "number"], (player, [target, money]) => {
+//@ts-ignore
+cmd.addArgument("player").chainArgument("number", false, (player, [target, money]) => {
     if (!Number.isSafeInteger(money))
         return player.sendMessage(`§cMoney needs to be a whole number!`);
     if (money < 0)

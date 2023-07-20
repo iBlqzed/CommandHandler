@@ -5,24 +5,21 @@ export class Command {
         this.data = {
             name: "",
             arguments: [],
-            chainedArguments: [],
             subCommands: {}
         };
         this.data.name = info.name.toLowerCase();
         this.data.permission = info.permission ?? (() => true);
-        this.data.callback = info.callback ?? (() => true);
+        this.data.callback = info.callback;
     }
     static register(command) {
         this.cache[command.data.name] = command.data;
     }
     addArgument(type, callback) {
-        this.data.arguments[this.data.arguments.length] = [type, callback];
-        return this;
+        //@ts-ignore
+        return (this.data.arguments[this.data.arguments.length] = new Argument(type, false, callback));
     }
-    //@ts-ignore
-    addChainedArguments(types, callback) {
-        this.data.chainedArguments[this.data.chainedArguments.length] = [types, callback];
-        return this;
+    addOptionalArgument(type, callback) {
+        return (this.data.arguments[this.data.arguments.length] = new Argument(type, true, callback));
     }
     addSubCommand(command) {
         this.data.subCommands[command.data.name] = command.data;
@@ -30,6 +27,56 @@ export class Command {
     }
 }
 Command.cache = {};
+class Argument {
+    constructor(type, optional = false, callback) {
+        this.type = type;
+        this.optional = optional;
+        this.callback = callback;
+    }
+    //@ts-ignore
+    chainArgument(type, optional = false, callback) {
+        if (this.optional && !optional)
+            optional = true;
+        //@ts-ignore
+        return (this.nextArg = new Argument(type, optional, callback));
+    }
+    execute(player, arg, other, prevResult) {
+        const handleOptionalError = () => {
+            if (!this.nextArg) {
+                //@ts-ignore
+                this.callback?.(player, prevResult ? [prevResult, null] : null);
+                return true;
+            }
+            let nextArg = this.nextArg;
+            const results = prevResult ? [...prevResult] : [null];
+            while (true) {
+                if (!nextArg.nextArg)
+                    return;
+                nextArg = nextArg.nextArg;
+                results.push(null);
+                break;
+            }
+            nextArg.callback(player, results);
+            return true;
+        };
+        if (!arg || arg === "") {
+            if (this.optional)
+                return handleOptionalError();
+            return false;
+        }
+        const [result, args] = argTypes[this.type](arg, other, player) ?? [undefined, undefined];
+        if (!args) {
+            if (this.optional)
+                return handleOptionalError();
+            return false;
+        }
+        if (this.nextArg)
+            return this.nextArg.execute(player, args.shift(), args, prevResult ? [...prevResult, result] : [result]);
+        //@ts-ignore
+        this.callback?.(player, prevResult ? [...prevResult, result] : result);
+        return true;
+    }
+}
 const argTypes = {};
 world.beforeEvents.chatSend.subscribe(ev => {
     if (!ev.message.startsWith(commandPrefix))
@@ -44,14 +91,28 @@ world.afterEvents.chatSend.subscribe(ev => {
     const [name, ...args] = ev.message.slice(commandPrefix.length).trim().split(/\s+/g);
     //@ts-ignore
     let data = Command.cache[name.toLowerCase()];
+    //@ts-ignore
+    if (data?.callback)
+        data.callback(player, args);
     let nextArg = args.shift();
     if (!data)
         return player.sendMessage(`§cInvalid command!`);
+    //@ts-ignore
     if (!data.permission(player))
         return player.sendMessage(`§cInvalid command permission!`);
-    data.callback(player, [nextArg, ...args]);
+    const end = (arg) => {
+        const keys = Object.keys(data.subCommands);
+        const argthing = (arg, prevType = "") => {
+            //@ts-ignore
+            if (arg.nextArg)
+                return argthing(arg.nextArg, prevType + arg.type + "-");
+            return prevType + arg.type;
+        };
+        //@ts-ignore
+        player.sendMessage(`§cInvalid argument ${arg ?? "[Nothing]"}, expected ${[(keys.length === 0 ? undefined : keys.join(", ")), (data.arguments.length === 0 ? undefined : data.arguments.map(v => argthing(v)).join(", "))].filter(v => v).join(" or ")}`);
+    };
     while (true) {
-        const sub = data.subCommands[nextArg ?? ''];
+        const sub = data.subCommands?.[nextArg ?? ''];
         if (sub) {
             if (!sub.permission(player))
                 return player.sendMessage(`§cInvalid sub-command permission for command ${sub.name}!`);
@@ -59,49 +120,19 @@ world.afterEvents.chatSend.subscribe(ev => {
             nextArg = args.shift();
             continue;
         }
-        const oldArg = nextArg;
         let found = false;
-        for (const chainedArg of data.chainedArguments) {
-            const results = [];
-            let argsCopy = args.map(v => v);
-            for (const arg of chainedArg[0]) {
-                if (!nextArg)
-                    break;
-                const [result, v] = (argTypes[arg](nextArg, argsCopy, player) ?? [undefined, undefined]);
-                if (!v)
-                    break;
-                results.push(result);
-                argsCopy = v;
-                nextArg = v.shift();
-            }
-            nextArg = oldArg;
-            if (results.length !== chainedArg[0].length)
-                continue;
-            chainedArg[1](player, results);
-            found = true;
-            break;
-        }
-        if (found)
-            return;
-        if (data.arguments.length === 0) {
-            if (!found)
-                player.sendMessage(`§cInvalid argument ${nextArg ?? "[Nothing]"}, expected ${data.chainedArguments.map(v => v[0].join(", ")).join(" or ")}`);
-            break;
-        }
-        if (!nextArg || nextArg === "") {
-            player.sendMessage(`§cInvalid argument [Nothing], expected ${data.arguments.map(v => v[0]).join(", ")}`);
-            break;
-        }
+        if (data.arguments.length === 0)
+            return end();
         for (const arg of data.arguments) {
-            const [result, v] = (argTypes[arg[0]](nextArg, args, player) ?? [undefined, undefined]);
-            if (!v)
+            //@ts-ignore
+            const worked = arg.execute(player, nextArg, args);
+            if (!worked)
                 continue;
-            arg[1](player, result);
             found = true;
             break;
         }
         if (!found)
-            player.sendMessage(`§cInvalid argument ${nextArg}, expected ${data.arguments.map(v => v[0]).join(", ")}`);
+            return end(nextArg);
         break;
     }
 });
@@ -114,12 +145,12 @@ addArgument("all", (nextArg, args) => {
 });
 addArgument("string", (nextArg, args) => {
     if (nextArg.startsWith('"')) {
-        const argsCopy = new Proxy(args, {});
+        const argsCopy = args.map(v => v);
         let currentArg = nextArg, result = "";
         while (currentArg) {
             result += " " + currentArg;
-            if (result.endsWith('"'))
-                return [result.slice(1, -1), argsCopy];
+            if (result.endsWith('"') && result !== ' "')
+                return [result.slice(2, -1), argsCopy];
             currentArg = argsCopy.shift();
         }
     }
@@ -148,12 +179,25 @@ addArgument("player", (nextArg, args, player) => {
     while (currentArg) {
         result += currentArg;
         if (result.endsWith('"')) {
-            const player = world.getPlayers({ name: result.slice(1, -1) })[0];
-            if (!player)
+            const target = world.getPlayers({ name: result.slice(1, -1) })[0];
+            if (!target)
                 return end(`Player ${result} not online!`);
-            return [player, args];
+            return [target, args];
         }
-        args.shift();
+        currentArg = args.shift();
+    }
+    return end(`Player name needs to end with a "!`);
+});
+addArgument("offlinePlayer", (nextArg, args, player) => {
+    const end = (msg) => player.sendMessage(`§c${msg}`);
+    if (!nextArg.startsWith('"'))
+        return end(`Invalid argument ${nextArg ?? "[Nothing]"}! Player name needs to start with "!`);
+    let currentArg = nextArg, result = "";
+    while (currentArg) {
+        result += currentArg;
+        if (result.endsWith('"'))
+            return [result.slice(1, -1), args];
+        currentArg = args.shift();
     }
     return end(`Player name needs to end with a "!`);
 });

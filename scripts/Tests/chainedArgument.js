@@ -1,9 +1,11 @@
 import { Command } from "../CommandHandler/index.js";
 const cmd = new Command({ name: "test-chained" });
-cmd.addChainedArguments(["string", "number"], (player, [str, num]) => {
-    player.sendMessage(`You input a string (${str}) and then a number (${num})`);
+//@ts-ignore
+cmd.addArgument("number").chainArgument("string", false, (player, [str, num]) => {
+    player.sendMessage(`You input a number (${str}) and then a string (${num})`);
 });
-cmd.addChainedArguments(["number", "string"], (player, [num, str]) => {
-    player.sendMessage(`You input a number (${num}) and then a string (${str})`);
+//@ts-ignore
+cmd.addArgument("string").chainArgument("number", false, (player, [str, num]) => {
+    player.sendMessage(`You input a string (${str}) and then a number (${num})`);
 });
 Command.register(cmd);

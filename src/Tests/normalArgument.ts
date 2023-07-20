@@ -1,5 +1,4 @@
 import { Command } from "../CommandHandler/index.js"
-import { world } from "@minecraft/server"
 
 const cmd = new Command({ name: "test-normal" })
 
