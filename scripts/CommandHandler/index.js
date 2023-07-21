@@ -1,4 +1,4 @@
-import { world } from "@minecraft/server";
+import { world, ItemTypes } from "@minecraft/server";
 const commandPrefix = "-";
 export class Command {
     constructor(info) {
@@ -100,7 +100,7 @@ world.afterEvents.chatSend.subscribe(ev => {
     //@ts-ignore
     if (!data.permission(player))
         return player.sendMessage(`§cInvalid command permission!`);
-    const end = (arg) => {
+    const end = () => {
         const keys = Object.keys(data.subCommands);
         const argthing = (arg, prevType = "") => {
             //@ts-ignore
@@ -109,7 +109,8 @@ world.afterEvents.chatSend.subscribe(ev => {
             return prevType + arg.type;
         };
         //@ts-ignore
-        player.sendMessage(`§cInvalid argument ${arg ?? "[Nothing]"}, expected ${[(keys.length === 0 ? undefined : keys.join(", ")), (data.arguments.length === 0 ? undefined : data.arguments.map(v => argthing(v)).join(", "))].filter(v => v).join(" or ")}`);
+        const thing = [nextArg, ...args].join(" ");
+        player.sendMessage(`§cInvalid arguments ${thing.length === 0 ? "[Nothing]" : thing}, expected ${[(keys.length === 0 ? undefined : keys.join(", ")), (data.arguments.length === 0 ? undefined : data.arguments.map(v => argthing(v)).join(", "))].filter(v => v).join(" or ")}`);
     };
     while (true) {
         const sub = data.subCommands?.[nextArg ?? ''];
@@ -122,17 +123,17 @@ world.afterEvents.chatSend.subscribe(ev => {
         }
         let found = false;
         if (data.arguments.length === 0)
-            return end();
+            return;
         for (const arg of data.arguments) {
             //@ts-ignore
-            const worked = arg.execute(player, nextArg, args);
+            const worked = arg.execute(player, nextArg, args.map(v => v));
             if (!worked)
                 continue;
             found = true;
             break;
         }
         if (!found)
-            return end(nextArg);
+            end();
         break;
     }
 });
@@ -158,9 +159,8 @@ addArgument("string", (nextArg, args) => {
 });
 addArgument("number", (nextArg, args) => {
     const v = Number(nextArg);
-    if (isNaN(v))
-        return;
-    return [v, args];
+    if (!isNaN(v))
+        return [v, args];
 });
 addArgument("boolean", (nextArg, args) => {
     const v = nextArg.toLowerCase();
@@ -200,4 +200,9 @@ addArgument("offlinePlayer", (nextArg, args, player) => {
         currentArg = args.shift();
     }
     return end(`Player name needs to end with a "!`);
+});
+addArgument("item", (nextArg, args) => {
+    const v = ItemTypes.get(nextArg);
+    if (v)
+        return [v, args];
 });

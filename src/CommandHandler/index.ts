@@ -1,4 +1,4 @@
-import { world, Player } from "@minecraft/server"
+import { world, Player, ItemType, ItemTypes } from "@minecraft/server"
 
 const commandPrefix = "-"
 
@@ -90,29 +90,17 @@ type GetArgument<T extends Argument<keyof CommandArguments, any>> = T extends Ar
 type FlattenArray<T extends any[]> = T extends [infer Head, infer Rest] ? [...(Head extends any[] ? FlattenArray<Head> : [Head]), ...(Rest extends any[] ? FlattenArray<Rest> : [Rest])] : [];
 //@ts-ignore
 type ReverseArgumentArray<T extends Argument<keyof CommandArguments, any>> = T extends Argument<infer P, infer K> ? K extends undefined ? [P] : [...ReverseArgumentArray<K>, P] : T
-
-const argTypes: Partial<{ [K in keyof CommandArguments]: (nextArg: string, args: string[], player: Player) => [CommandArguments[K], string[]] | undefined }> = {}
-
-
-type CommandArguments = {
-	string: string
-	number: number
-	boolean: boolean
-	player: Player
-	offlinePlayer: string
-	all: string
-}
-
 type CommandInfo = {
 	name: string
 	permission?: (player: Player) => boolean
 	callback?: (player: Player, args: string[]) => void
 }
-
 type CommandData = CommandInfo & {
 	arguments: Argument<keyof CommandArguments>[]
 	subCommands: Record<string, CommandData>
 }
+
+const argTypes: Partial<{ [K in keyof CommandArguments]: (nextArg: string, args: string[], player: Player) => [CommandArguments[K], string[]] | undefined }> = {}
 
 world.beforeEvents.chatSend.subscribe(ev => {
 	if (!ev.message.startsWith(commandPrefix)) return
@@ -132,7 +120,7 @@ world.afterEvents.chatSend.subscribe(ev => {
 	if (!data) return player.sendMessage(`§cInvalid command!`)
 	//@ts-ignore
 	if (!data.permission(player)) return player.sendMessage(`§cInvalid command permission!`)
-	const end = (arg?: string) => {
+	const end = () => {
 		const keys = Object.keys(data.subCommands)
 		const argthing = (arg: Argument<any>, prevType: any = ""): string => {
 			//@ts-ignore
@@ -140,7 +128,8 @@ world.afterEvents.chatSend.subscribe(ev => {
 			return prevType + arg.type
 		}
 		//@ts-ignore
-		player.sendMessage(`§cInvalid argument ${arg ?? "[Nothing]"}, expected ${[(keys.length === 0 ? undefined : keys.join(", ")), (data.arguments.length === 0 ? undefined : data.arguments.map(v => argthing(v)).join(", "))].filter(v => v).join(" or ")}`)
+		const thing = [nextArg, ...args].join(" ")
+		player.sendMessage(`§cInvalid arguments ${thing.length === 0 ? "[Nothing]" : thing}, expected ${[(keys.length === 0 ? undefined : keys.join(", ")), (data.arguments.length === 0 ? undefined : data.arguments.map(v => argthing(v)).join(", "))].filter(v => v).join(" or ")}`)
 	}
 	while (true) {
 		const sub = data.subCommands?.[nextArg ?? '']
@@ -151,18 +140,28 @@ world.afterEvents.chatSend.subscribe(ev => {
 			continue
 		}
 		let found = false
-		if (data.arguments.length === 0) return end()
+		if (data.arguments.length === 0) return
 		for (const arg of data.arguments) {
 			//@ts-ignore
-			const worked = arg.execute(player, nextArg, args)
+			const worked = arg.execute(player, nextArg, args.map(v => v))
 			if (!worked) continue
 			found = true
 			break
 		}
-		if (!found) return end(nextArg)
+		if (!found) end()
 		break
 	}
 })
+
+type CommandArguments = {
+	string: string
+	number: number
+	boolean: boolean
+	player: Player
+	offlinePlayer: string
+	item: ItemType
+	all: string
+}
 
 function addArgument<T extends keyof CommandArguments>(type: T, callback: (nextArg: string, args: string[], player: Player) => [CommandArguments[T], string[]] | void) {
 	//@ts-ignore
@@ -188,8 +187,7 @@ addArgument("string", (nextArg, args) => {
 
 addArgument("number", (nextArg, args) => {
 	const v = Number(nextArg)
-	if (isNaN(v)) return
-	return [v, args]
+	if (!isNaN(v)) return [v, args]
 })
 
 addArgument("boolean", (nextArg, args) => {
@@ -227,4 +225,9 @@ addArgument("offlinePlayer", (nextArg, args, player) => {
 		currentArg = args.shift()
 	}
 	return end(`Player name needs to end with a "!`)
+})
+
+addArgument("item", (nextArg, args) => {
+	const v = ItemTypes.get(nextArg)
+	if (v) return [v, args]
 })

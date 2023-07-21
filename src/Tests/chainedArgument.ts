@@ -8,7 +8,7 @@ cmd.addArgument("number").chainArgument("string", false, (player, [str, num]) =>
 })
 
 //@ts-ignore
-cmd.addArgument("string").chainArgument("number", false, (player, [str, num]) => {
+cmd.addArgument("string").chainArgument("string", false, (player, [str, num]) => {
 	player.sendMessage(`You input a string (${str}) and then a number (${num})`)
 })
 

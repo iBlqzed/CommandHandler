@@ -1,4 +1,4 @@
-import { Player } from "@minecraft/server";
+import { Player, ItemType } from "@minecraft/server";
 export declare class Command {
     private static cache;
     static register(command: Command): void;
@@ -21,14 +21,6 @@ declare type ArgumentArrayToChain<T extends (keyof CommandArguments)[]> = T exte
 declare type GetArgument<T extends Argument<keyof CommandArguments, any>> = T extends Argument<infer E, infer P> ? P extends undefined ? CommandArguments[E] : FlattenArray<[CommandArguments[E], GetArgument<P>]> : T;
 declare type FlattenArray<T extends any[]> = T extends [infer Head, infer Rest] ? [...(Head extends any[] ? FlattenArray<Head> : [Head]), ...(Rest extends any[] ? FlattenArray<Rest> : [Rest])] : [];
 declare type ReverseArgumentArray<T extends Argument<keyof CommandArguments, any>> = T extends Argument<infer P, infer K> ? K extends undefined ? [P] : [...ReverseArgumentArray<K>, P] : T;
-declare type CommandArguments = {
-    string: string;
-    number: number;
-    boolean: boolean;
-    player: Player;
-    offlinePlayer: string;
-    all: string;
-};
 declare type CommandInfo = {
     name: string;
     permission?: (player: Player) => boolean;
@@ -37,5 +29,14 @@ declare type CommandInfo = {
 declare type CommandData = CommandInfo & {
     arguments: Argument<keyof CommandArguments>[];
     subCommands: Record<string, CommandData>;
+};
+declare type CommandArguments = {
+    string: string;
+    number: number;
+    boolean: boolean;
+    player: Player;
+    offlinePlayer: string;
+    item: ItemType;
+    all: string;
 };
 export {};
