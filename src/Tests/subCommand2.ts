@@ -6,12 +6,12 @@ const subCmdRemove = new Command({ name: "remove" })
 
 //@ts-ignore
 subCmdAdd.addArgument("player").chainArgument("all", false, async (player, [target, tag]) => {
-	player.sendMessage(`§aAdded tag "${tag}"§r to ${target.name}`)
+	player.sendMessage(`§aAdded tag "${tag}§r§a" to ${target.name}`)
 	target.addTag(tag)
 })
 
 subCmdRemove.addArgument("player").chainArgument("all", false, async (player, [target, tag]) => {
-	player.sendMessage(`§aRemoved tag "${tag}"§r from ${target.name}`)
+	player.sendMessage(`§aRemoved tag "${tag}§r§a" from ${target.name}`)
 	target.removeTag(tag)
 })
 

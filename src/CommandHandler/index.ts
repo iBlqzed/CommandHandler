@@ -55,7 +55,7 @@ class Argument<T extends keyof CommandArguments, Prev extends Argument<keyof Com
 		const handleOptionalError = () => {
 			if (!this.nextArg) {
 				//@ts-ignore
-				system.run(() => this.callback?.(player, prevResult ? [prevResult, null] : null))
+				this.callback?.(player, prevResult ? [prevResult, null] : null)
 				return true
 			}
 			let nextArg = this.nextArg
@@ -66,7 +66,7 @@ class Argument<T extends keyof CommandArguments, Prev extends Argument<keyof Com
 				results.push(null)
 				break
 			}
-			system.run(() => nextArg.callback(player, results as any))
+			nextArg.callback(player, results as any)
 			return true
 		}
 		if (!arg || arg === "") {
@@ -80,7 +80,7 @@ class Argument<T extends keyof CommandArguments, Prev extends Argument<keyof Com
 		}
 		if (this.nextArg) return this.nextArg.execute(player, args.shift(), args, prevResult ? [...prevResult, result] : [result])
 		//@ts-ignore
-		system.run(() => this.callback?.(player, prevResult ? [...prevResult, result] : result))
+		this.callback?.(player, prevResult ? [...prevResult, result] : result)
 		return true
 	}
 }
@@ -142,7 +142,7 @@ world.afterEvents.chatSend.subscribe(ev => {
 			continue
 		}
 		let found = false
-		if (data.arguments.length === 0) return
+		if (data.arguments.length === 0 && Object.keys(data.subCommands).length === 0) return
 		for (const arg of data.arguments) {
 			//@ts-ignore
 			const worked = arg.execute(player, nextArg, args.map(v => v))

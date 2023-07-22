@@ -1,4 +1,4 @@
-import { world, ItemTypes, system } from "@minecraft/server";
+import { world, ItemTypes } from "@minecraft/server";
 const commandPrefix = "-";
 export class Command {
     constructor(info) {
@@ -45,7 +45,7 @@ class Argument {
         const handleOptionalError = () => {
             if (!this.nextArg) {
                 //@ts-ignore
-                system.run(() => this.callback?.(player, prevResult ? [prevResult, null] : null));
+                this.callback?.(player, prevResult ? [prevResult, null] : null);
                 return true;
             }
             let nextArg = this.nextArg;
@@ -57,7 +57,7 @@ class Argument {
                 results.push(null);
                 break;
             }
-            system.run(() => nextArg.callback(player, results));
+            nextArg.callback(player, results);
             return true;
         };
         if (!arg || arg === "") {
@@ -74,7 +74,7 @@ class Argument {
         if (this.nextArg)
             return this.nextArg.execute(player, args.shift(), args, prevResult ? [...prevResult, result] : [result]);
         //@ts-ignore
-        system.run(() => this.callback?.(player, prevResult ? [...prevResult, result] : result));
+        this.callback?.(player, prevResult ? [...prevResult, result] : result);
         return true;
     }
 }
@@ -123,7 +123,7 @@ world.afterEvents.chatSend.subscribe(ev => {
             continue;
         }
         let found = false;
-        if (data.arguments.length === 0)
+        if (data.arguments.length === 0 && Object.keys(data.subCommands).length === 0)
             return;
         for (const arg of data.arguments) {
             //@ts-ignore
