@@ -1,6 +1,6 @@
 import { Command } from "../CommandHandler/index.js"
 
-const cmd = new Command({ name: "test-sub" })
+const cmd = new Command({ name: "test-sub1" })
 const subCmdAdd = new Command({ name: "add" })
 const subCmdRemove = new Command({ name: "remove" })
 

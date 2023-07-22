@@ -1,4 +1,4 @@
-import { world, ItemTypes } from "@minecraft/server";
+import { world, ItemTypes, system } from "@minecraft/server";
 const commandPrefix = "-";
 export class Command {
     constructor(info) {
@@ -8,6 +8,7 @@ export class Command {
             subCommands: {}
         };
         this.data.name = info.name.toLowerCase();
+        this.data.description = info.description;
         this.data.permission = info.permission ?? (() => true);
         this.data.callback = info.callback;
     }
@@ -44,7 +45,7 @@ class Argument {
         const handleOptionalError = () => {
             if (!this.nextArg) {
                 //@ts-ignore
-                this.callback?.(player, prevResult ? [prevResult, null] : null);
+                system.run(() => this.callback?.(player, prevResult ? [prevResult, null] : null));
                 return true;
             }
             let nextArg = this.nextArg;
@@ -56,7 +57,7 @@ class Argument {
                 results.push(null);
                 break;
             }
-            nextArg.callback(player, results);
+            system.run(() => nextArg.callback(player, results));
             return true;
         };
         if (!arg || arg === "") {
@@ -73,7 +74,7 @@ class Argument {
         if (this.nextArg)
             return this.nextArg.execute(player, args.shift(), args, prevResult ? [...prevResult, result] : [result]);
         //@ts-ignore
-        this.callback?.(player, prevResult ? [...prevResult, result] : result);
+        system.run(() => this.callback?.(player, prevResult ? [...prevResult, result] : result));
         return true;
     }
 }
@@ -177,9 +178,9 @@ addArgument("player", (nextArg, args, player) => {
         return end(`Invalid argument ${nextArg ?? "[Nothing]"}! Player name needs to start with "!`);
     let currentArg = nextArg, result = "";
     while (currentArg) {
-        result += currentArg;
+        result += " " + currentArg;
         if (result.endsWith('"')) {
-            const target = world.getPlayers({ name: result.slice(1, -1) })[0];
+            const target = world.getPlayers({ name: result.slice(2, -1) })[0];
             if (!target)
                 return end(`Player ${result} not online!`);
             return [target, args];
@@ -205,4 +206,33 @@ addArgument("item", (nextArg, args) => {
     const v = ItemTypes.get(nextArg);
     if (v)
         return [v, args];
+});
+addArgument("time", (nextArg, args) => {
+    const lower = nextArg.toLowerCase();
+    if (lower === "permanent" || lower === "perm")
+        return ["permanent", args];
+    let t = parseInt(lower), i = 0, unit = args[0]?.[0]?.toLowerCase();
+    if (isNaN(t)) {
+        i = 1;
+        const v = /^(\d+)\s*(\w+)$/.exec(args.join(" "));
+        if (!v)
+            return;
+        t = parseInt(v[1]);
+        unit = v[2][0].toLowerCase();
+    }
+    if (isNaN(t))
+        return;
+    const v = (num) => [Number(t) * num, args.slice(i)];
+    if (unit === "s")
+        return v(1000);
+    if (unit === "m")
+        return v(60000);
+    if (unit === "h")
+        return v(3600000);
+    if (unit === "d")
+        return v(86400000);
+    if (unit === "w")
+        return v(604800000);
+    if (unit === "y")
+        return v(220752000000);
 });

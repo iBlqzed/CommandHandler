@@ -1,4 +1,4 @@
-import { world, Player, ItemType, ItemTypes } from "@minecraft/server"
+import { world, Player, ItemType, ItemTypes, system } from "@minecraft/server"
 
 const commandPrefix = "-"
 
@@ -17,6 +17,7 @@ export class Command {
 
 	constructor(info: CommandInfo) {
 		this.data.name = info.name.toLowerCase()
+		this.data.description = info.description
 		this.data.permission = info.permission ?? (() => true)
 		this.data.callback = info.callback
 	}
@@ -54,7 +55,7 @@ class Argument<T extends keyof CommandArguments, Prev extends Argument<keyof Com
 		const handleOptionalError = () => {
 			if (!this.nextArg) {
 				//@ts-ignore
-				this.callback?.(player, prevResult ? [prevResult, null] : null)
+				system.run(() => this.callback?.(player, prevResult ? [prevResult, null] : null))
 				return true
 			}
 			let nextArg = this.nextArg
@@ -65,7 +66,7 @@ class Argument<T extends keyof CommandArguments, Prev extends Argument<keyof Com
 				results.push(null)
 				break
 			}
-			nextArg.callback(player, results as any)
+			system.run(() => nextArg.callback(player, results as any))
 			return true
 		}
 		if (!arg || arg === "") {
@@ -79,7 +80,7 @@ class Argument<T extends keyof CommandArguments, Prev extends Argument<keyof Com
 		}
 		if (this.nextArg) return this.nextArg.execute(player, args.shift(), args, prevResult ? [...prevResult, result] : [result])
 		//@ts-ignore
-		this.callback?.(player, prevResult ? [...prevResult, result] : result)
+		system.run(() => this.callback?.(player, prevResult ? [...prevResult, result] : result))
 		return true
 	}
 }
@@ -92,6 +93,7 @@ type FlattenArray<T extends any[]> = T extends [infer Head, infer Rest] ? [...(H
 type ReverseArgumentArray<T extends Argument<keyof CommandArguments, any>> = T extends Argument<infer P, infer K> ? K extends undefined ? [P] : [...ReverseArgumentArray<K>, P] : T
 type CommandInfo = {
 	name: string
+	description?: string
 	permission?: (player: Player) => boolean
 	callback?: (player: Player, args: string[]) => void
 }
@@ -161,6 +163,7 @@ type CommandArguments = {
 	offlinePlayer: string
 	item: ItemType
 	all: string
+	time: number | "permanent"
 }
 
 function addArgument<T extends keyof CommandArguments>(type: T, callback: (nextArg: string, args: string[], player: Player) => [CommandArguments[T], string[]] | void) {
@@ -204,9 +207,9 @@ addArgument("player", (nextArg, args, player) => {
 	if (!nextArg.startsWith('"')) return end(`Invalid argument ${nextArg ?? "[Nothing]"}! Player name needs to start with "!`)
 	let currentArg = nextArg, result = ""
 	while (currentArg) {
-		result += currentArg
+		result += " " + currentArg
 		if (result.endsWith('"')) {
-			const target = world.getPlayers({ name: result.slice(1, -1) })[0]
+			const target = world.getPlayers({ name: result.slice(2, -1) })[0]
 			if (!target) return end(`Player ${result} not online!`)
 			return [target, args]
 		}
@@ -230,4 +233,25 @@ addArgument("offlinePlayer", (nextArg, args, player) => {
 addArgument("item", (nextArg, args) => {
 	const v = ItemTypes.get(nextArg)
 	if (v) return [v, args]
+})
+
+addArgument("time", (nextArg, args) => {
+	const lower = nextArg.toLowerCase()
+	if (lower === "permanent" || lower === "perm") return ["permanent", args]
+	let t = parseInt(lower), i = 0, unit = args[0]?.[0]?.toLowerCase()
+	if (isNaN(t)) {
+		i = 1
+		const v = /^(\d+)\s*(\w+)$/.exec(args.join(" "))
+		if (!v) return
+		t = parseInt(v[1])
+		unit = v[2][0].toLowerCase()
+	}
+	if (isNaN(t)) return
+	const v = (num: number): [number, string[]] => [Number(t) * num, args.slice(i)]
+	if (unit === "s") return v(1000)
+	if (unit === "m") return v(60000)
+	if (unit === "h") return v(3600000)
+	if (unit === "d") return v(86400000)
+	if (unit === "w") return v(604800000)
+	if (unit === "y") return v(220752000000)
 })

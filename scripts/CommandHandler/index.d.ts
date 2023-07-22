@@ -23,6 +23,7 @@ declare type FlattenArray<T extends any[]> = T extends [infer Head, infer Rest] 
 declare type ReverseArgumentArray<T extends Argument<keyof CommandArguments, any>> = T extends Argument<infer P, infer K> ? K extends undefined ? [P] : [...ReverseArgumentArray<K>, P] : T;
 declare type CommandInfo = {
     name: string;
+    description?: string;
     permission?: (player: Player) => boolean;
     callback?: (player: Player, args: string[]) => void;
 };
@@ -38,5 +39,6 @@ declare type CommandArguments = {
     offlinePlayer: string;
     item: ItemType;
     all: string;
+    time: number | "permanent";
 };
 export {};
