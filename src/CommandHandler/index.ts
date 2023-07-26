@@ -200,34 +200,29 @@ addArgument("boolean", (nextArg, args) => {
 })
 
 addArgument("player", (nextArg, args, player) => {
-	const end = (msg: string): [undefined, undefined] => {
-		player.sendMessage(`§c${msg}`)
-		return [undefined, undefined]
+	if (!nextArg.startsWith('"')) {
+		const target = world.getPlayers({ name: nextArg })[0]
+		if (target) return [target, args]
 	}
-	if (!nextArg.startsWith('"')) return end(`Invalid argument ${nextArg ?? "[Nothing]"}! Player name needs to start with "!`)
 	let currentArg = nextArg, result = ""
 	while (currentArg) {
 		result += " " + currentArg
 		if (result.endsWith('"')) {
 			const target = world.getPlayers({ name: result.slice(2, -1) })[0]
-			if (!target) return end(`Player ${result} not online!`)
-			return [target, args]
+			if (target) return [target, args]
 		}
 		currentArg = args.shift()
 	}
-	return end(`Player name needs to end with a "!`)
 })
 
 addArgument("offlinePlayer", (nextArg, args, player) => {
-	const end = (msg: string) => player.sendMessage(`§c${msg}`)
-	if (!nextArg.startsWith('"')) return end(`Invalid argument ${nextArg ?? "[Nothing]"}! Player name needs to start with "!`)
+	if (!nextArg.startsWith('"')) return [nextArg, args]
 	let currentArg = nextArg, result = ""
 	while (currentArg) {
-		result += currentArg
-		if (result.endsWith('"')) return [result.slice(1, -1), args]
+		result += " " + currentArg
+		if (result.endsWith('"')) return [result.slice(2, -1), args]
 		currentArg = args.shift()
 	}
-	return end(`Player name needs to end with a "!`)
 })
 
 addArgument("item", (nextArg, args) => {
@@ -238,10 +233,10 @@ addArgument("item", (nextArg, args) => {
 addArgument("time", (nextArg, args) => {
 	const lower = nextArg.toLowerCase()
 	if (lower === "permanent" || lower === "perm") return ["permanent", args]
-	let t = parseInt(lower), i = 0, unit = args[0]?.[0]?.toLowerCase()
+	let t = parseInt(lower), i = 1, unit = args[0]?.[0]?.toLowerCase()
 	if (isNaN(t)) {
-		i = 1
-		const v = /^(\d+)\s*(\w+)$/.exec(args.join(" "))
+		i = 0
+		const v = /^(\d+)\s*(\w+)$/.exec(args[0])
 		if (!v) return
 		t = parseInt(v[1])
 		unit = v[2][0].toLowerCase()
